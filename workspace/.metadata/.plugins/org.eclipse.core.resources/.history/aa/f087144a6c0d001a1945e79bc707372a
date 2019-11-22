@@ -23,7 +23,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -35,10 +35,18 @@
 /* USER CODE BEGIN PD */
 
 //#of samples user accesses per data block
+#define PI 3.14159f
+
+//sample rate and output frequency of sine
+#define F_SAMPLE		48000.0f
+#define F_OUT			1000.0f
+
+//#of samples user accesses per data block
 #define DATASIZE 128
 
 //full size of buffer
 #define FULLBUFFERSIZE 256
+
 
 /* USER CODE END PD */
 
@@ -49,18 +57,35 @@
 
 /* Private variables ---------------------------------------------------------*/
 I2S_HandleTypeDef hi2s2;
-DMA_HandleTypeDef hdma_spi2_rx;
+I2S_HandleTypeDef hi2s3;
+DMA_HandleTypeDef hdma_spi2_tx;
+DMA_HandleTypeDef hdma_spi3_rx;
 
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
 //ADC and DAC buffers
+struct uint_24 {
+    unsigned uint24 :24;
+} __attribute__((packed));
+
 uint32_t adc_val[FULLBUFFERSIZE];
 uint32_t dac_val[FULLBUFFERSIZE];
+
+uint24 data = 0;
 
 //pointers to the half-buffer, which will get processed
 static volatile uint32_t* inbuffptr;
 static volatile uint32_t* outbuffptr;
+
+
+/*float mySinVal;
+float sample_dt;
+uint16_t sample_N;
+uint16_t i_t;
+
+int32_t dataI2S[4400];
+uint16_t data;*/
 
 /* USER CODE END PV */
 
@@ -70,31 +95,40 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_I2S2_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_I2S3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc)
-{
-//first half of ADC buffer is full
-	inbuffptr = &adc_val[0];
-	outbuffptr = &dac_val[DATASIZE];
-
-
-
-
-}
-
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+/*void HAL_I2S_RxHalfCpltCallback(I2S_HandleTypeDef *hi2s)
 {
 
 	//first half of ADC buffer is full
-		inbuffptr = &adc_val[DATASIZE];
-		outbuffptr = &dac_val[0];
+		inbuffptr = &adc_val[0];
+		outbuffptr = &dac_val[DATASIZE];
 
 
+}*/
+
+
+
+/*void HAL_I2S_RxCpltCallback(I2S_HandleTypeDef *hi2s)
+{
+
+	//second half of ADC buffer is full
+			inbuffptr = &adc_val[DATASIZE];
+			outbuffptr = &dac_val[0];
+
+
+}*/
+
+void processDSP(){
+	for(int n = 0; n < DATASIZE; n++){
+		//input coming in is identical to output
+		outbuffptr[n] = inbuffptr[n];
+	}
 }
 /* USER CODE END 0 */
 
@@ -105,7 +139,8 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+	//sample_dt = F_OUT/F_SAMPLE;
+	//sample_N = F_SAMPLE/F_OUT;
   /* USER CODE END 1 */
   
 
@@ -130,7 +165,18 @@ int main(void)
   MX_DMA_Init();
   MX_I2S2_Init();
   MX_TIM2_Init();
+  MX_I2S3_Init();
   /* USER CODE BEGIN 2 */
+
+  //Build Sine wave
+    /*for (uint16_t i=0; i<sample_N; i++) {
+    	mySinVal = sinf(i*2*PI*sample_dt);
+    	dataI2S[i*2] = (mySinVal)*8388607;    //left data (L WS) (0 2 4 6 8 10 12)
+    	dataI2S[i*2 + 1] = (mySinVal + 1)*4194303; //Right data (H WS)  (1 3 5 7 9 11 13)
+    	dataI2S[i*2] = ((dataI2S[i*2] & 0x00FFFF00) >> 8) | ((dataI2S[i*2] & 0xFF) << 24);
+    	dataI2S[i*2 + 1] = ((dataI2S[i*2 + 1] & 0x00FFFF00) >> 8) | ((dataI2S[i*2 + 1] & 0xFF) << 24);
+    }*/
+
 
   /* USER CODE END 2 */
 
@@ -138,6 +184,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
+	  HAL_I2S_Receive_DMA(&hi2s3, (uint16_t *)&data, 1);
+	  HAL_I2S_Transmit_DMA(&hi2s2, (uint16_t *)&data, 1);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -211,11 +260,11 @@ static void MX_I2S2_Init(void)
 
   /* USER CODE END I2S2_Init 1 */
   hi2s2.Instance = SPI2;
-  hi2s2.Init.Mode = I2S_MODE_MASTER_RX;
-  hi2s2.Init.Standard = I2S_STANDARD_MSB;
+  hi2s2.Init.Mode = I2S_MODE_MASTER_TX;
+  hi2s2.Init.Standard = I2S_STANDARD_PHILIPS;
   hi2s2.Init.DataFormat = I2S_DATAFORMAT_24B;
   hi2s2.Init.MCLKOutput = I2S_MCLKOUTPUT_ENABLE;
-  hi2s2.Init.AudioFreq = I2S_AUDIOFREQ_96K;
+  hi2s2.Init.AudioFreq = I2S_AUDIOFREQ_48K;
   hi2s2.Init.CPOL = I2S_CPOL_LOW;
   hi2s2.Init.ClockSource = I2S_CLOCK_PLL;
   hi2s2.Init.FullDuplexMode = I2S_FULLDUPLEXMODE_DISABLE;
@@ -226,6 +275,40 @@ static void MX_I2S2_Init(void)
   /* USER CODE BEGIN I2S2_Init 2 */
 
   /* USER CODE END I2S2_Init 2 */
+
+}
+
+/**
+  * @brief I2S3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2S3_Init(void)
+{
+
+  /* USER CODE BEGIN I2S3_Init 0 */
+
+  /* USER CODE END I2S3_Init 0 */
+
+  /* USER CODE BEGIN I2S3_Init 1 */
+
+  /* USER CODE END I2S3_Init 1 */
+  hi2s3.Instance = SPI3;
+  hi2s3.Init.Mode = I2S_MODE_MASTER_RX;
+  hi2s3.Init.Standard = I2S_STANDARD_PHILIPS;
+  hi2s3.Init.DataFormat = I2S_DATAFORMAT_24B;
+  hi2s3.Init.MCLKOutput = I2S_MCLKOUTPUT_ENABLE;
+  hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_48K;
+  hi2s3.Init.CPOL = I2S_CPOL_LOW;
+  hi2s3.Init.ClockSource = I2S_CLOCK_PLL;
+  hi2s3.Init.FullDuplexMode = I2S_FULLDUPLEXMODE_DISABLE;
+  if (HAL_I2S_Init(&hi2s3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2S3_Init 2 */
+
+  /* USER CODE END I2S3_Init 2 */
 
 }
 
@@ -250,7 +333,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 839;
+  htim2.Init.Period = 849;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -284,9 +367,12 @@ static void MX_DMA_Init(void)
   __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
-  /* DMA1_Stream3_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
+  /* DMA1_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+  /* DMA1_Stream4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
 
 }
 
@@ -301,8 +387,8 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
 }
 

@@ -85,10 +85,6 @@ void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc)
 //first half of ADC buffer is full
 	inbuffptr = &adc_val[0];
 	outbuffptr = &dac_val[DATASIZE];
-
-
-
-
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
@@ -97,8 +93,6 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 	//first half of ADC buffer is full
 		inbuffptr = &adc_val[DATASIZE];
 		outbuffptr = &dac_val[0];
-
-
 }
 
 //placeholder for DSP function block

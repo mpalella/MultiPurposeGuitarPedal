@@ -1,6 +1,6 @@
-21:56:50 **** Incremental Build of configuration Debug for project messingWithADC ****
+15:09:33 **** Incremental Build of configuration Debug for project messingWithADC ****
 Info: Internal Builder is used for build
 Info: Parallel threads used: 0
 
-21:56:51 Build Finished. 0 errors, 0 warnings. (took 996ms)
+15:09:34 Build Finished. 0 errors, 0 warnings. (took 1s.57ms)
 
